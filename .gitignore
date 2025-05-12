@@ -1,0 +1,18 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv
+env/
+.venv/
+
+# === Node.js / React ===
+node_modules/
+build/
+.env
+.DS_Store
+
+# === General ===
+*.log
+.vscode/
+.idea/
