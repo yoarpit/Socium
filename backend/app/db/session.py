@@ -11,6 +11,12 @@ post_collection = db["posts"]
 auth_collection = db["auth"]
 comment_collection =db["comments"]
 likes_collection=db["likes"]
+token_blacklist = db["token_blacklist"]
 
 
 
+
+auth_collection.create_index("username",unique=True)
+auth_collection.create_index("email",unique=True)
+
+token_blacklist.create_index("exp", expireAfterSeconds=0)
