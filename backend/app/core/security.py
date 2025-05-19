@@ -38,3 +38,8 @@ def decode_access_token(token: str) -> Optional[dict]:
     
 def generate_otp() -> str:
     return str(random.randint(100000, 999999))
+
+
+
+
+

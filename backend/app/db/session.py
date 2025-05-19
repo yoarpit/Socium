@@ -12,7 +12,7 @@ auth_collection = db["auth"]
 comment_collection =db["comments"]
 likes_collection=db["likes"]
 token_blacklist = db["token_blacklist"]
-
+notifications_collection=db["notification"]
 
 
 

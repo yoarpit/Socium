@@ -1,15 +1,24 @@
-from pydantic import BaseModel,Field,HttpUrl
-from datetime import datetime,timezone
+# app/schemas/post.py
+
+from pydantic import BaseModel
 from typing import Optional
-class Post(BaseModel):
+from datetime import datetime,timezone
+
+class CreatePostModel(BaseModel):
     title: str
     content: str
-    author_id: str
     image_url: Optional[str] = None
-    created_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PostOut(BaseModel):
+    id: str
+    title: str
+    content: str
+    image_url: Optional[str]
+    created_at: datetime
+    author: str  # username or user ID
 
 
-class EditPost(BaseModel):
-    title:Optional[str]=None
-    content:Optional[str]=None
-    image_url: Optional[str] = None
+class UpdatePostModel(BaseModel):
+    title: Optional[str]
+    content: Optional[str]
+    image_url: Optional[str]    

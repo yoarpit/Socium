@@ -1,13 +1,16 @@
 from app.schemas.auth import RegisterModel,UserOut,LoginModel,TokenOut,VerifyOTPModel
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends,Security
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime,timedelta,timezone
 from app.core.security import  hash_password,verify_password,create_access_token,decode_access_token,Header,generate_otp
 from app.db.session import auth_collection,token_blacklist
 from app.configure.email_utility import send_otp_email
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 auth=APIRouter()
 
+security = HTTPBearer()
 
 @auth.post("/register", response_model=UserOut)
 def register(user: RegisterModel):
@@ -91,18 +94,37 @@ def get_me(Authorization: str = Header(...)):
 
 
 
-
 @auth.post("/logout")
-def logout(Authorization: str = Header(...)):
-    if not Authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid Authorization header")
-
-    token = Authorization.split(" ")[1]
+def logout(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+):
+    token = credentials.credentials
     payload = decode_access_token(token)
-    print(token)
+
+    # decode or blacklist token
     token_blacklist.insert_one({
         "token": token,
-        "exp": datetime.fromtimestamp(payload["exp"], tz=timezone.utc)  
+        "exp": datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
     })
+    return {"message": "Signed out"}
 
-    return {"message": "Signed out successfully"}
+
+
+# app/dependencies/auth.py
+
+def get_current_user(Authorization: str = Header(...)):
+    if not Authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    
+    token = Authorization.split(" ")[1]
+    if token_blacklist.find_one({"token": token}):
+        raise HTTPException(status_code=401, detail="Token has been revoked")
+
+    payload = decode_access_token(token)
+    username = payload.get("sub")
+
+    user = auth_collection.find_one({"username": username})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user

@@ -1,24 +1,59 @@
-from fastapi import APIRouter,HTTPException
-from app.schemas.post import Post,EditPost
-from app.db.session import post_collection,users_collection
+from fastapi import APIRouter, Depends,HTTPException
+from datetime import datetime,timezone
+from app.schemas.post import CreatePostModel, PostOut, UpdatePostModel
+from app.db.session import post_collection
+from app.api.v1.endpoints.auth import get_current_user
 from bson import ObjectId
 
+post = APIRouter()
 
-post=APIRouter()
-
-@post.post("/posts/")
-def create_post(post: Post):
-    try:
-        author_obj_id = ObjectId(post.author_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid author_id format")
-
-    user = users_collection.find_one({"_id": author_obj_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="Author (user) not found")
-
-    post_data = post.model_dump()
-    post_data["author_id"] = author_obj_id  # store as actual ObjectId in MongoDB
+@post.post("/posts", response_model=PostOut)
+def create_post(data: CreatePostModel,current_user: dict = Depends(get_current_user)):
+    post_data = {
+        "title": data.title,
+        "content": data.content,
+        "image_url": data.image_url,
+        "created_at": datetime.now(timezone.utc),
+        "author": current_user["username"]
+    }
 
     result = post_collection.insert_one(post_data)
-    return {"id": str(result.inserted_id), "message": "Post created"}
+    post_data["_id"] = str(result.inserted_id)
+
+    return {
+        "id": post_data["_id"],
+        **data.model_dump(),
+        "created_at": post_data["created_at"],
+        "author": post_data["author"]
+    }
+
+
+
+
+@post.put("/posts/{post_id}")
+def update_post(post_id: str, data: UpdatePostModel, current_user: dict = Depends(get_current_user)):
+    post = post_collection.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post["author"] != current_user["username"]:
+        raise HTTPException(status_code=403, detail="Not authorized to update this post")
+
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No data provided for update")
+
+    post_collection.update_one({"_id": ObjectId(post_id)}, {"$set": update_data})
+    return {"message": "Post updated successfully"}
+
+@post.delete("/posts/{post_id}")
+def delete_post(post_id: str, current_user: dict = Depends(get_current_user)):
+    post = post_collection.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post["author"] != current_user["username"]:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+
+    post_collection.delete_one({"_id": ObjectId(post_id)})
+    return {"message": "Post deleted successfully"}
